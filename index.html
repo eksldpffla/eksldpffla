@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>songs</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400&family=DM+Sans:wght@300;400&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root { --bg:#0e0e0e; --surface:#181818; --border:#2a2a2a; --text:#e8e8e8; --muted:#555; --accent:#c8f07a; --radius:14px; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-weight:300; min-height:100vh; text-transform:lowercase; }
+
+  .all-btn {
+    position:fixed; top:32px; right:28px;
+    background:none; border:none; color:var(--muted);
+    font-size:.72rem; font-family:'DM Mono',monospace;
+    cursor:pointer; transition:color .15s; padding:4px; z-index:5;
+  }
+  .all-btn:hover { color:var(--text); }
+
+  #view-main {
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    min-height:100vh; padding:40px 20px; gap:10px;
+  }
+
+  .form-block { display:flex; flex-direction:column; gap:10px; width:100%; max-width:480px; }
+
+  input[type=url] {
+    background:var(--surface); border:none; box-shadow:none;
+    border-radius:var(--radius); padding:11px 14px;
+    font-size:.85rem; font-family:'DM Sans',sans-serif;
+    font-weight:300; color:var(--text); width:100%;
+    outline:none; appearance:none; -webkit-appearance:none;
+  }
+  input[type=url]::placeholder { color:var(--muted); }
+
+  .err { font-size:.72rem; font-family:'DM Mono',monospace; color:#ff5555; display:none; padding:0 2px; }
+  .err.show { display:block; }
+
+  .submit {
+    margin-top:4px; background:var(--accent); color:#0e0e0e;
+    border:none; border-radius:var(--radius); padding:11px 22px;
+    font-size:.82rem; font-family:'DM Mono',monospace; font-weight:400;
+    cursor:pointer; align-self:flex-start; outline:none;
+    transition:opacity .15s, transform .1s; min-width:120px;
+  }
+  .submit:hover { opacity:.85; }
+  .submit:active { transform:scale(.97); }
+  .submit:disabled { opacity:.35; cursor:default; transform:none; }
+
+  .songs-panel {
+    position:fixed; inset:0; background:var(--bg);
+    z-index:10; overflow-y:auto; padding:48px 24px 80px;
+    transform:translateY(100%);
+    transition:transform .28s cubic-bezier(.4,0,.2,1);
+    scrollbar-width:thin; scrollbar-color:var(--border) transparent;
+  }
+  .songs-panel::-webkit-scrollbar { width:4px; }
+  .songs-panel::-webkit-scrollbar-track { background:transparent; }
+  .songs-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+  .songs-panel::-webkit-scrollbar-thumb:hover { background:var(--muted); }
+  .songs-panel.open { transform:translateY(0); }
+
+  .panel-header {
+    display:flex; align-items:center; justify-content:space-between;
+    max-width:600px; margin:0 auto 28px;
+  }
+  .panel-header span { font-family:'DM Mono',monospace; font-size:.72rem; color:var(--muted); }
+  .panel-close { background:none; border:none; color:var(--muted); font-family:'DM Mono',monospace; font-size:.9rem; cursor:pointer; }
+  .panel-close:hover { color:var(--text); }
+
+  .songs-list { display:flex; flex-direction:column; gap:16px; max-width:600px; margin:0 auto; }
+  .s-item { display:flex; flex-direction:column; gap:6px; }
+  .s-embed { border-radius:12px; overflow:hidden; width:100%; border:none; display:block; }
+  .s-embed-yt { aspect-ratio:16/9; }
+  .s-footer { display:flex; align-items:center; justify-content:space-between; padding:0 2px; }
+  .s-platform { font-size:.65rem; font-family:'DM Mono',monospace; color:var(--muted); }
+  .s-platform.spotify { color:#1db954; }
+  .s-platform.youtube { color:#ff4444; }
+  .s-open { font-size:.65rem; font-family:'DM Mono',monospace; color:var(--muted); text-decoration:none; transition:color .12s; }
+  .s-open:hover { color:var(--text); }
+  .s-del { display:none; background:none; border:none; color:#ff5555; font-size:.65rem; font-family:'DM Mono',monospace; cursor:pointer; padding:0; opacity:.5; }
+  .s-del:hover { opacity:1; }
+  body.admin-mode .s-del { display:block; }
+
+  .admin-dot { display:none; width:5px; height:5px; border-radius:50%; background:var(--accent); position:fixed; top:36px; left:28px; z-index:5; }
+  body.admin-mode .admin-dot { display:block; }
+
+  .overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.65); z-index:30; align-items:center; justify-content:center; padding:24px; }
+  .overlay.open { display:flex; }
+  .pw-modal { background:var(--surface); border-radius:20px; padding:28px; max-width:320px; width:100%; display:flex; flex-direction:column; gap:12px; position:relative; }
+  .pw-modal input { background:var(--bg); border:none; border-radius:var(--radius); padding:11px 14px; font-size:.85rem; font-family:'DM Mono',monospace; color:var(--text); outline:none; width:100%; letter-spacing:.1em; }
+  .pw-modal input::placeholder { color:var(--muted); letter-spacing:0; }
+  .pw-submit { background:var(--accent); color:#0e0e0e; border:none; border-radius:var(--radius); padding:11px; font-size:.8rem; font-family:'DM Mono',monospace; cursor:pointer; transition:opacity .15s; }
+  .pw-submit:hover { opacity:.85; }
+  .pw-err { font-size:.7rem; font-family:'DM Mono',monospace; color:#ff5555; display:none; }
+  .pw-err.show { display:block; }
+  .modal-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted); font-size:.9rem; cursor:pointer; font-family:'DM Mono',monospace; }
+  .modal-close:hover { color:var(--text); }
+</style>
+</head>
+<body>
+
+<div class="admin-dot"></div>
+<button class="all-btn" onclick="openPanel()">all songs recommended by people</button>
+
+<div id="view-main">
+  <div class="form-block">
+    <input type="url" id="url-input" placeholder="spotify or youtube link" maxlength="300">
+    <div class="err" id="err-msg">only spotify and youtube links</div>
+    <button class="submit" id="btn-add" onclick="submitLink()">recommend</button>
+  </div>
+</div>
+
+<div class="songs-panel" id="songs-panel">
+  <div class="panel-header">
+    <span>all songs recommended by people</span>
+    <button class="panel-close" onclick="closePanel()">✕</button>
+  </div>
+  <div class="songs-list" id="songs-list"></div>
+</div>
+
+<div class="overlay" id="overlay-admin-pw">
+  <div class="pw-modal">
+    <button class="modal-close" onclick="closeAdminPw()">✕</button>
+    <input type="password" id="admin-pw-input" placeholder="password" maxlength="30">
+    <div class="pw-err" id="admin-pw-err">wrong password</div>
+    <button class="pw-submit" onclick="submitAdminPw()">enter</button>
+  </div>
+</div>
+
+<script>
+  const BIN_ID  = '6a1875d5ddf5aa59f770b5ea';
+  const API_KEY = '$2a$10$jHWMbBExEFMfeR9a2Ms89um6cscjnxHjIXYih4QT5Gb1C1zosBdNK';
+  const BASE    = 'https://api.jsonbin.io/v3/b/' + BIN_ID;
+  const HEADERS = { 'Content-Type':'application/json', 'X-Master-Key':API_KEY, 'X-Bin-Versioning':'false' };
+  const PW_HASH = '93042fda5440a61987ae640d1bb67b68932880379fca73ade669a4542a7341fb';
+
+  let recs = [];
+  let fullRecord = {};
+  let panelLoaded = false;
+  let adminMode = false;
+  let eCount = 0, eTimer = null;
+
+  async function sha256(str) {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+  }
+
+  document.addEventListener('keydown', ev => {
+    if (ev.key !== 'e') { eCount = 0; clearTimeout(eTimer); return; }
+    eCount++; clearTimeout(eTimer);
+    eTimer = setTimeout(() => { eCount = 0; }, 2000);
+    if (eCount >= 10) {
+      eCount = 0;
+      if (!adminMode) {
+        document.getElementById('overlay-admin-pw').classList.add('open');
+        setTimeout(() => document.getElementById('admin-pw-input').focus(), 50);
+      } else {
+        adminMode = false;
+        document.body.classList.remove('admin-mode');
+      }
+    }
+  });
+
+  document.getElementById('admin-pw-input').addEventListener('keydown', e => { if (e.key === 'Enter') submitAdminPw(); });
+
+  async function submitAdminPw() {
+    const val  = document.getElementById('admin-pw-input').value;
+    const err  = document.getElementById('admin-pw-err');
+    const hash = await sha256(val);
+    if (hash === PW_HASH) {
+      adminMode = true;
+      document.body.classList.add('admin-mode');
+      document.getElementById('admin-pw-input').value = '';
+      err.classList.remove('show');
+      document.getElementById('overlay-admin-pw').classList.remove('open');
+    } else {
+      err.classList.add('show');
+    }
+  }
+
+  function closeAdminPw() {
+    document.getElementById('overlay-admin-pw').classList.remove('open');
+    document.getElementById('admin-pw-input').value = '';
+    document.getElementById('admin-pw-err').classList.remove('show');
+  }
+
+  function openPanel() {
+    document.getElementById('songs-panel').classList.add('open');
+    if (!panelLoaded) { renderPanel(); panelLoaded = true; }
+  }
+  function closePanel() {
+    document.getElementById('songs-panel').classList.remove('open');
+  }
+
+  function getPlatform(url) {
+    try {
+      const h = new URL(url).hostname.replace('www.','');
+      if (h === 'open.spotify.com' || h === 'spotify.com') return 'spotify';
+      if (h === 'youtube.com' || h === 'youtu.be') return 'youtube';
+    } catch {}
+    return null;
+  }
+
+  function getEmbedUrl(url, platform) {
+    try {
+      if (platform === 'spotify') return url.replace('open.spotify.com/','open.spotify.com/embed/').split('?')[0];
+      if (platform === 'youtube') {
+        const u = new URL(url);
+        const vid = u.hostname === 'youtu.be' ? u.pathname.slice(1) : u.searchParams.get('v');
+        if (vid) return 'https://www.youtube.com/embed/' + vid;
+      }
+    } catch {}
+    return null;
+  }
+
+  function lock()   { const b = document.getElementById('btn-add'); b.disabled=true;  b.textContent='...'; }
+  function unlock() { const b = document.getElementById('btn-add'); b.disabled=false; b.textContent='recommend'; }
+
+  async function fetchRecs() {
+    try {
+      const res  = await fetch(BASE + '/latest', { headers: HEADERS });
+      const data = await res.json();
+      fullRecord = data.record || {};
+      recs = fullRecord.recs || [];
+    } catch { recs = []; }
+  }
+
+  async function saveRecs() {
+    const body = JSON.stringify({ ...fullRecord, recs });
+    const res = await fetch(BASE, { method:'PUT', headers: HEADERS, body });
+    if (!res.ok) throw new Error('save failed');
+    fullRecord = { ...fullRecord, recs };
+  }
+
+  async function submitLink() {
+    const input  = document.getElementById('url-input');
+    const errEl  = document.getElementById('err-msg');
+    const url    = input.value.trim();
+    errEl.classList.remove('show');
+    if (!url) { input.focus(); return; }
+    const platform = getPlatform(url);
+    if (!platform) { errEl.classList.add('show'); return; }
+    lock();
+    try {
+      await fetchRecs();
+      recs.unshift({ id: Date.now(), url, platform });
+      await saveRecs();
+      input.value = '';
+      panelLoaded = false;
+    } catch(e) {
+      errEl.textContent = 'failed to save, try again';
+      errEl.classList.add('show');
+    }
+    unlock();
+  }
+
+  async function deleteRec(id) {
+    await fetchRecs();
+    recs = recs.filter(r => r.id !== id);
+    await saveRecs();
+    panelLoaded = false;
+    renderPanel();
+  }
+
+  function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function renderPanel() {
+    const list = document.getElementById('songs-list');
+    list.innerHTML = '';
+    if (!recs.length) {
+      list.innerHTML = '<span style="font-size:.72rem;font-family:\'DM Mono\',monospace;color:var(--muted)">no songs yet</span>';
+      return;
+    }
+    recs.forEach(r => {
+      const platform = r.platform || getPlatform(r.url);
+      if (!platform) return;
+      const embedUrl = getEmbedUrl(r.url, platform);
+      if (!embedUrl) return;
+      const li = document.createElement('div');
+      li.className = 's-item';
+      const iframeHtml = platform === 'spotify'
+        ? '<iframe class="s-embed" src="'+esc(embedUrl)+'" width="100%" height="80" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy" scrolling="no" frameborder="0"></iframe>'
+        : '<iframe class="s-embed s-embed-yt" src="'+esc(embedUrl)+'" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>';
+      const label = platform === 'spotify' ? '● spotify' : '▶ youtube';
+      const del   = '<button class="s-del" onclick="deleteRec('+r.id+')">✕</button>';
+      li.innerHTML = iframeHtml +
+        '<div class="s-footer">'+
+          '<span class="s-platform '+platform+'">'+label+'</span>'+
+          '<a class="s-open" href="'+esc(r.url)+'" target="_blank" rel="noopener">open ↗</a>'+
+          del+
+        '</div>';
+      list.appendChild(li);
+    });
+  }
+
+  fetchRecs();
+</script>
+</body>
+</html>
